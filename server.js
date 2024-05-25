@@ -47,6 +47,6 @@ app.get('/api/search', async (req, res) => {
     }
 });
 
-app.listen(3000, () => {
+app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
 });

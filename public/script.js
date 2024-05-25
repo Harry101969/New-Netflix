@@ -8,18 +8,33 @@ const apiPaths = {
   searchOnYoutube: (query) => `${apiEndpoint}/search?query=${query}`
 };
 
-function init() {
-  fetchTrendingMovies();
-  fetchAndBuildAllSections();
+async function fetchJSON(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Network response was not ok');
+    return await response.json();
+  } catch (error) {
+    console.error('Fetch error:', error);
+    return null;
+  }
 }
 
-function fetchTrendingMovies() {
-  fetchAndBuildMovieSection(apiPaths.fetchTrending, 'Trending Now').then(list => {
+async function init() {
+  try {
+    await fetchTrendingMovies();
+    await fetchAndBuildAllSections();
+  } catch (error) {
+    console.error('Initialization error:', error);
+  }
+}
+
+async function fetchTrendingMovies() {
+  const data = await fetchJSON(apiPaths.fetchTrending);
+  if (data && data.results) {
+    const list = data.results;
     const randomIndex = parseInt(Math.random() * list.length);
     buildBannerSection(list[randomIndex]);
-  }).catch(err => {
-    console.error(err);
-  });
+  }
 }
 
 function buildBannerSection(movie) {
@@ -48,43 +63,39 @@ function buildBannerSection(movie) {
   bannerCont.append(div);
 }
 
-function fetchAndBuildAllSections() {
-  fetch(apiPaths.fetchAllCategories)
-    .then(res => res.json())
-    .then(res => {
-      const categories = res.genres;
-      if (Array.isArray(categories) && categories.length) {
-        categories.forEach(category => {
-          fetchAndBuildMovieSection(apiPaths.fetchMoviesList(category.id), category.name);
-        });
-      }
-    })
-    .catch(err => console.error(err));
+async function fetchAndBuildAllSections() {
+  const data = await fetchJSON(apiPaths.fetchAllCategories);
+  if (data && data.genres) {
+    const categories = data.genres;
+    if (Array.isArray(categories) && categories.length) {
+      categories.forEach(category => {
+        fetchAndBuildMovieSection(apiPaths.fetchMoviesList(category.id), category.name);
+      });
+    }
+  }
 }
 
-function fetchAndBuildMovieSection(fetchUrl, categoryName) {
+async function fetchAndBuildMovieSection(fetchUrl, categoryName) {
   console.log(fetchUrl, categoryName);
-  return fetch(fetchUrl)
-    .then(res => res.json())
-    .then(res => {
-      console.table(res.results);
-      const movies = res.results;
-      if (Array.isArray(movies) && movies.length) {
-        buildMoviesSection(movies, categoryName);
-      }
-      return movies;
-    })
-    .catch(err => console.log(err));
+  const data = await fetchJSON(fetchUrl);
+  if (data && data.results) {
+    const movies = data.results;
+    if (Array.isArray(movies) && movies.length) {
+      buildMoviesSection(movies, categoryName);
+    }
+    return movies;
+  }
 }
 
 function buildMoviesSection(list, categoryName) {
   console.log(list, categoryName);
   const moviesCont = document.querySelector('#movies-cont');
   const moviesListHTML = list.map(item => {
-    return `<div class="movie-item" ondblclick="searchMovieTrailer('${item.title}', 'yt${item.id}')">
-              <img class="movie-item-img" src="${imgPath}${item.backdrop_path}" alt="${item.title}">
-              <iframe width="245px" height="150px" src="" id="yt${item.id}"></iframe>
-            </div>`;
+    return `
+      <div class="movie-item" ondblclick="searchMovieTrailer('${item.title}', 'yt${item.id}')">
+        <img class="movie-item-img" src="${imgPath}${item.backdrop_path}" alt="${item.title}">
+        <iframe width="245px" height="150px" src="" id="yt${item.id}"></iframe>
+      </div>`;
   }).join('');
   const moviesSectionHTML = `
       <h2 class="movie-section-heading">${categoryName}<span class="explore-nudge">Explore All</span></h2>
@@ -98,18 +109,17 @@ function buildMoviesSection(list, categoryName) {
   moviesCont.append(div);
 }
 
-function searchMovieTrailer(movieName, iframId) {
+async function searchMovieTrailer(movieName, iframId) {
   if (!movieName) return;
-  fetch(apiPaths.searchOnYoutube(movieName))
-    .then(res => res.json())
-    .then(res => {
-      const bestResult = res.items[0];
-      const youtubeUrl = `https://www.youtube.com/watch?v=${bestResult.id.videoId}`;
-      console.log(youtubeUrl);
-      window.open(youtubeUrl, '_blank');
-      const elements = document.getElementById(iframId);
-      elements.src = `https://www.youtube.com/embed/${bestResult.id.videoId}?=1&controls=0`;
-    }).catch(err => console.log(err));
+  const data = await fetchJSON(apiPaths.searchOnYoutube(movieName));
+  if (data && data.items) {
+    const bestResult = data.items[0];
+    const youtubeUrl = `https://www.youtube.com/watch?v=${bestResult.id.videoId}`;
+    console.log(youtubeUrl);
+    window.open(youtubeUrl, '_blank');
+    const elements = document.getElementById(iframId);
+    elements.src = `https://www.youtube.com/embed/${bestResult.id.videoId}?=1&controls=0`;
+  }
 }
 
 window.addEventListener('load', function () {
