@@ -1,0 +1,1 @@
+type node server.js to run this project in the vs code terminal.
